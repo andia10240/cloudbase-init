@@ -17,6 +17,8 @@ import sys
 import mi
 from oslo_log import log as oslo_logging
 import wmi
+import functools
+import time
 
 from cloudbaseinit import exception
 from cloudbaseinit.models import network as network_model
@@ -132,6 +134,23 @@ class NetLBFOTeamManager(network_team.BaseNetworkTeamManager):
         operation_options = {u'custom_options': custom_options}
         team.put(operation_options=operation_options)
 
+    @staticmethod
+    def retry(retry_time=3, sleep_time=3):
+        def wrap(f):
+            @functools.wraps(f)
+            def inner(*args, **kwargs):
+                for _ in range(0, retry_time):
+                    try:
+                        LOG.debug("retry times:%s", retry_time)
+                        return f(*args, **kwargs)
+                    except Exception as ex:
+                        time.sleep(sleep_time)
+                raise ex
+
+            return inner
+        return wrap
+
+    @retry(retry_time=3, sleep_time=3)
     def create_team(self, team_name, mode, load_balancing_algorithm,
                     members, mac_address, primary_nic_name=None,
                     primary_nic_vlan_id=None, lacp_timer=None):
